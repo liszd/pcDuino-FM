@@ -1,36 +1,66 @@
 pcDuino-FM
 ==========
 
-###目标
-这算是我FYP的一部分吧  
-FYP想做一个可以听歌，识别歌曲的盒子。  
-这一部分就只是豆瓣fm的功能。  
+This is a Part of my FYP(Final Year Project)  
+My FYP will build a Music Box.  
+The pcDuino-FM will be one of the main funcion.  
+Other function include music listening, music identify.  
 
-另外自己还有个曲库，做进一步的听歌和识别。
+And now it still run on python.
 
-####进度
+##Update
+---
 
+###Version.2
+Change the media library from `pyglet` to `mplayer`  
+Add new function about library volume
 
-1. 登入 - 在terminal中输入账号密码，弹窗显示验证码输入
-2. 播放 - 显示进度条，暂停等
-3. 准备换MP3-library, 现在用的 `pyglet` 只能播放本地歌曲，下一步换成`pygst`。
-4. 配置`pyglet` 环境失败，下一步可能会转战`Ruby`
+###Version.1
+Fundamentally finish the main function  
+1. Can login in with Douban account.  
+2. Can listen music. (If login, will listen `红心` music, else listen `私人` music)  
+3. Use `pyget` play music.(It can't listen url, need to download. Maybe I will change the libary, like `pyglet`)  
+4. music progress bar  
+5. music can be pasued  
 
-以上都是在mac上操作，不知道 `pcDuino` 又会有什么问题。
+##Features
+---
+It also not finish yet.
 
+##Installation
+---
+```
+pip install getpass
+brew install PIL
+pip install getch
+brew install mplayer
+```
 
+##How to use
+---
+###Login
 
-###以下都是构想，就当立牌坊
+login Douban. Input the account, password, and verification code.
+verification code will be showed as picture.
+And I know it is not a good way to show verification code, maybe I will try buletooth in future
 
-####登入
+###Function
+Choose the  function  
 
-暂时没有解决登入的验证码问题（pcduino）
-
-1. orc文字识别？
-2. 手机蓝牙登入？
-
-####频道
-
+```
+"p"：# Play/Pause(P)
+"l"：# Get the playlist(L)
+"n"：# Next music(N)
+"+"：# Increase volume(+) (have bug)
+"-"：# Decrease Volume(-) (have bug)
+"c"：#单曲循环/取消单曲循环(C)(Not finished)
+"i"：#标红心/取消红心(I) (Not finished)
+"d"：#不再播放(D) (Not finished)
+"c"：#现则兆赫(C) (Not finished)
+"h"：#帮助(H) (Not finished)
+"e"：#退出(E) (Not finished)
+```
+###Channel
 ```
 -3   红心
  0   私人
@@ -46,24 +76,26 @@ FYP想做一个可以听歌，识别歌曲的盒子。
 10   电影原声
 ```
 
-####功能
+## License
+---
+(The MIT License)
 
-```
-"p": #播放/暂停(P)
-"l": #查看播放列表(L)
-"n": #下一首(N)
-"c": #单曲循环/取消单曲循环(C)
-"i": #标红心/取消红心(I)
-"d": #不再播放(D)
-"c": #现则兆赫(C)
-"h": #帮助(H)
-"e": #退出(E)
-```
+Copyright (c) 2014 Liam <lidzd1992@gmail.com>
 
-###废话说完
-```
-代码还没有写完，暂时不放。
-没有移植到pcduino上,暂时为python代码。
-本来想写ruby的，听说pcduino还不可靠，我还是谨慎点吧
-暂时没有写对应的pcduino按钮
-```
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
