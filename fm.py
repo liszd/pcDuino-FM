@@ -6,15 +6,12 @@ import os
 import sys
 import subprocess
 import time,datetime
-import pyglet
-import threading,thread
 import urllib,urllib2
 import getpass
 from cookielib import CookieJar
 from cStringIO import StringIO
 from PIL import Image
-from getch import getch
-
+import getch
 
 reload(sys)
 sys.setdefaultencoding('utf-8')
@@ -22,9 +19,6 @@ sys.setdefaultencoding('utf-8')
 prog_str = "%3d%% [%-2s]"
 
 class DoubanFM():
-	def __init__(self):
-		self.player = pyglet.media.Player()
-
 
 	def login(self, username, password):
 		opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(CookieJar()))
@@ -56,7 +50,17 @@ class DoubanFM():
 				print '登录成功'
 				return opener
 
+	def getPlayList(self, channel='0', opener=None):
+		url = 'http://douban.fm/j/mine/playlist?type=n&channel=' + channel + '&from=mainsite'
+		if opener == None:
+			return json.loads(urllib.urlopen(url).read())
+		else:
+			return json.loads(opener.open(urllib2.Request(url)).read())
+
 	def play(self, opener=None, channel=0):
+
+		global pauseTime ,pause_flag, starttime, volume
+		fnull=open(os.devnull,"w")
 		while True:
 			if opener == None:
 				playlist = DoubanFM.getPlayList("0")
@@ -68,6 +72,7 @@ class DoubanFM():
 
 			# 获取播放列表
 			for song in playlist['song']:
+
 				# 播放
 				print '--------------------'
 				if channel == '-3':
@@ -81,75 +86,143 @@ class DoubanFM():
 					print '已标记喜欢'
 				print '--------------------'
 
-				length =  int(int(song['length']) / 5)
-				#print "like:",song['like']
-				title = song['title']+".mp3"
-				FNULL = open(os.devnull, 'w')
-				player = subprocess.call(['wget', '-c', song['url'], '-O', title], stdout=FNULL, stderr=subprocess.STDOUT)
-				time.sleep(1)
-				filename=title
-				source=pyglet.media.load(filename)
-				player=pyglet.media.Player()
-				player.queue(source)
-				player.play()
+				player = subprocess.Popen(['mplayer', '-af', 'volume=0', song['url']], stdin=subprocess.PIPE,stdout=fnull,stderr=fnull)
 
-				is_pause = 0
 				starttime = datetime.datetime.now()
-				passedTime = starttime-starttime
+				ret=0
+				currenttime=datetime.datetime.now()
+				passedTime=currenttime-starttime
+
 				pauseTime=0
+				pause_flag=0
 
-				while 1:
-					PP = raw_input()
+				while((passedTime.seconds-pauseTime)<30):
+					PP = getch.getch()
 
-					if PP == "p": #播放/暂停(P)
-						is_pause = self.pause(player, is_pause)
-					if PP == "l": #查看播放列表(L)
-						pass
 					if PP == "n": #下一首(N)
-						pass
-					if PP == "c": #单曲循环/取消单曲循环(C)
-						pass
-					if PP == "i": #标红心/取消红心(I)
-						pass
-					if PP == "d": #不再播放(D)
-						pass
-					if PP == "c": #现则兆赫(C)
-						pass
-					if PP == "h": #帮助(H)
-						pass
-					if PP == "e": #退出(E)
-						pass
+						time.sleep(0.5)
+						break
+					else:
+						self.choose(PP, player, playlist, song)
+						time.sleep(0.5)
 
-				#for i in range(length):
-				#	time.sleep(5)
-				#	DoubanFM.progress(i, length)
-
-				subprocess.call(['rm', title], stdout=FNULL, stderr=subprocess.STDOUT)
 				print "\n"
+				try:
+					player.stdin.write('q')
+				except OSError:
+					pass
 
-	def getPlayList(self, channel='0', opener=None):
-		url = 'http://douban.fm/j/mine/playlist?type=n&channel=' + channel + '&from=mainsite'
-		if opener == None:
-			return json.loads(urllib.urlopen(url).read())
+
+	def choose(self, PP, player, playlist, song):
+		return {
+		'p':lambda x:self.pause(player, song),
+		'l':lambda x:self.showlist(playlist),
+		'+':lambda x:self.increaseV(player),
+		'-':lambda x:self.decreaseV(player),
+		#'c':self.cycle(PP),
+		#'i':self.love(player),
+		#'d':#不再播放(D) (Not finished),
+		#'c':#现则兆赫(C) (Not finished),
+		#'h':#帮助(H) (Not finished),
+		#'e':#退出(E) (Not finished),
+		'n':'',
+		}.get(PP,'n')('n')
+
+	def pause(self, player, song):
+		global pause_flag, pauseTime, pauseStartTime, starttime
+		player.stdin.write('p')
+		time.sleep(0.2)
+		if pause_flag==0:
+			print '暂停'
+			pauseStartTime=datetime.datetime.now()
+			pause_flag=1
+			currenttime=datetime.datetime.now()
+			passedTime=currenttime-starttime
+			lastTime = 30 - passedTime.seconds + pauseTime
+			print '剩余时间:%.2d分%.2d秒\r' % ((song['length']-passedTime.seconds+pauseTime)/60,(song['length']-passedTime.seconds+pauseTime)%60),
 		else:
-			return json.loads(opener.open(urllib2.Request(url)).read())
+			print '播放'
+			pauseTime=pauseTime + (datetime.datetime.now()-pauseStartTime).seconds+1
+			pause_flag=0
 
+	def showlist(self, playlist):
+		num = 0
+		for song in playlist['song']:
+			num = num+1
+			print num,'.', song['title'].ljust(20),
+			print "-:",song['artist']
+			if num > 5:
+				break
 
-	def progress(self, i, length):
-		i = i+1
-		sys.stdout.write(chr(0x0d))
-		sys.stdout.write(prog_str % (i * 100 / length, i*'='))
-		sys.stdout.flush()
+	def increaseV(self, player):
+		print '增加音量',
+		player.stdin.write('0')
 
-	def pause(self, player, is_pause):
-		print '\r暂停/播放'
-		if is_pause:
-			player.play()
-			return 0
-		else:
-			player.pause()
-			return 1
+	def decreaseV(self, player):
+		print '减小音量',
+		player.stdin.write('9')
+
+	def cycle(self, player):
+		print '单曲播放/顺序播放',
+		c = 0 if cycle else 1
+
+	def love(self, player):
+		print '标红心/取消红心',
 		
+	def delete(self, player):
+		time.sleep(0.5)
+
+
+	def channel(self, PP):
+		PP = ['','']
+		PP = PP.split(" ")
+		if PP[1] == -1:
+			pass
+		elif PP[1] == 0:
+			pass
+		elif PP[1] == 1:
+			pass
+		elif PP[1] == 2:
+			pass
+		elif PP[1] == 3:
+			pass
+		elif PP[1] == 4:
+			pass
+		elif PP[1] == 5:
+			pass
+		elif PP[1] == 6:
+			pass
+		elif PP[1] == 7:
+			pass
+		elif PP[1] == 8:
+			pass		
+		elif PP[1] == 9:
+			pass
+		elif PP[1] == 10:
+			pass
+		else:
+			print '选择兆赫：(c 数字)'
+			print "-1  红心"
+			print "0   私人"
+			print "1   华语"
+			print "2   欧美"
+			print "3   七零"
+			print "4   八零"
+			print "5   九零"
+			print "6   粤语"
+			print "7   摇滚"
+			print "8   民谣"
+			print "9   轻音乐"
+			print "10  电影原声"
+
+
+	def help(self, player):
+		print '暂停/播放r',
+		player.stdin.write('p')
+
+	def quit(self, player):
+		print '暂停/播放r',
+		player.stdin.write('q')
 
 if __name__ == '__main__':
 	print "Welcome to the DoubanFM"
