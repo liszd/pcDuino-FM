@@ -1,22 +1,27 @@
 #!/usr/bin/python
-#coding:utf-8
+# coding:utf-8
 import httplib
 import json
 import os
 import sys
 import subprocess
-import time,datetime
-import urllib,urllib2
+import time
+import datetime
+import threading
+import urllib
+import urllib2
 import getpass
 from cookielib import CookieJar
 from cStringIO import StringIO
 from PIL import Image
 import getch
+import re
 
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
 prog_str = "%3d%% [%-2s]"
+
 
 class DoubanFM():
 
@@ -35,12 +40,12 @@ class DoubanFM():
 			response = json.loads(opener.open(
 				urllib2.Request('http://douban.fm/j/login'),
 				urllib.urlencode({
-					'source': 'radio',
-					'alias': username,
-					'form_password': password,
-					'captcha_solution': captcha,
-					'captcha_id': captcha_id,
-					'task': 'sync_channel_list'})).read())
+								 'source': 'radio',
+								 'alias': username,
+								 'form_password': password,
+								 'captcha_solution': captcha,
+								 'captcha_id': captcha_id,
+								 'task': 'sync_channel_list'})).read())
 			if 'err_msg' in response.keys():
 				print response['err_msg']
 				if not response['err_msg'].startswith("验证码"):
@@ -51,16 +56,17 @@ class DoubanFM():
 				return opener
 
 	def getPlayList(self, channel='0', opener=None):
-		url = 'http://douban.fm/j/mine/playlist?type=n&channel=' + channel + '&from=mainsite'
+		url = 'http://douban.fm/j/mine/playlist?type=n&channel=' + \
+			channel + '&from=mainsite'
 		if opener == None:
 			return json.loads(urllib.urlopen(url).read())
 		else:
 			return json.loads(opener.open(urllib2.Request(url)).read())
 
 	def play(self, opener=None, channel=0):
-
-		global pauseTime ,pause_flag, starttime, volume
-		fnull=open(os.devnull,"w")
+		
+		global cycle
+		cycle = False
 		while True:
 			if opener == None:
 				playlist = DoubanFM.getPlayList("0")
@@ -72,109 +78,166 @@ class DoubanFM():
 
 			# 获取播放列表
 			for song in playlist['song']:
-
-				# 播放
-				print '--------------------'
-				if channel == '-3':
-					print '当前频道：红心频道'
+				if cycle == False:
+					player = MusicPlayer(song, channel, playlist)
+					player.play()
 				else:
-					print '当前频道：'+str(channel)+'号电台'
-				print '歌曲：'+song['title']
-				print '演唱者：'+song['artist']
-				print '评分：'+str(song['rating_avg'])
-				if song['like'] == 1:
-					print '已标记喜欢'
-				print '--------------------'
-
-				player = subprocess.Popen(['mplayer', '-af', 'volume=0', song['url']], stdin=subprocess.PIPE,stdout=fnull,stderr=fnull)
-
-				starttime = datetime.datetime.now()
-				ret=0
-				currenttime=datetime.datetime.now()
-				passedTime=currenttime-starttime
-
-				pauseTime=0
-				pause_flag=0
-
-				while((passedTime.seconds-pauseTime)<30):
-					PP = getch.getch()
-
-					if PP == "n": #下一首(N)
-						time.sleep(0.5)
-						break
-					else:
-						self.choose(PP, player, playlist, song)
-						time.sleep(0.5)
-
-				print "\n"
-				try:
-					player.stdin.write('q')
-				except OSError:
-					pass
+					player.play()
 
 
-	def choose(self, PP, player, playlist, song):
-		return {
-		'p':lambda x:self.pause(player, song),
-		'l':lambda x:self.showlist(playlist),
-		'+':lambda x:self.increaseV(player),
-		'-':lambda x:self.decreaseV(player),
-		#'c':self.cycle(PP),
-		#'i':self.love(player),
-		#'d':#不再播放(D) (Not finished),
-		#'c':#现则兆赫(C) (Not finished),
-		#'h':#帮助(H) (Not finished),
-		#'e':#退出(E) (Not finished),
-		'n':'',
-		}.get(PP,'n')('n')
+class MusicPlayer():
+	def __init__(self, song, channel, playlist):
+		self.song = song
+		self.channel = channel
+		self.playlist  =playlist
+
+	def play(self):
+		global pause_flag, ret, pasuetime, passedTime, song_length, starttime
+		song = self.song
+		channel = self.channel
+		playlist = self.playlist
+		fnull = open(os.devnull, "w")
+		# 播放
+		print '--------------------'
+		if channel == '-3':
+			print '当前频道：红心频道'
+		else:
+			print '当前频道：' + str(channel) + '号电台'
+		print '歌曲：' + song['title']
+		print '演唱者：' + song['artist']
+		print '评分：' + str(song['rating_avg'])
+		if song['like'] == 1 and channel != '-3':
+			print '已标记喜欢'
+		print '--------------------'
+
+		player = subprocess.Popen(
+			['mplayer', '-af', 'volume=0', song['url']], stdin=subprocess.PIPE, stdout=fnull, stderr=fnull)
+		ret = song['length']
+		pause_flag = 0
+		starttime = datetime.datetime.now()
+		pasuetime = starttime - starttime
+		song_length  = song['length']
+		playerthread = PlayerControl(player, playlist, song)
+		processthread = ProcessControl(playerthread)
+
+		processthread.start()
+		playerthread.start()
+		processthread.join()
+
+		try:
+			playerthread.exit()
+			player.stdin.write('q')
+		except Exception, e:
+			pass
+		else:
+			pass
+
+class ProcessControl(threading.Thread):
+	def __init__(self, playerthread):
+		threading.Thread.__init__(self)
+		self.playerthread = playerthread
+
+	def run(self):
+		playerthread = self.playerthread
+		lock = threading.Lock()
+		global pause_flag, ret, pasuetime, passedTime, song_length, starttime
+		while(ret > 0):
+			with lock:
+				currenttime = datetime.datetime.now()
+				passedTime = currenttime - starttime - pasuetime
+				ret = song_length- passedTime.seconds-1
+				time.sleep(1)
+				print ret
+				if ret < 3:
+					print "end"
+					playerthread.stop()
+
+class PlayerControl(threading.Thread):
+
+	def __init__(self, player, playlist, song):
+		threading.Thread.__init__(self)
+		self.player = player
+		self.playlist = playlist
+		self.song = song
+		self.thread_stop = False
+
+	def run(self):
+		while not self.thread_stop:
+			{
+				'p': lambda x: self.pause(self.player, self.song),
+				'l': lambda x: self.showlist(self.playlist),
+				'+': lambda x: self.increaseV(self.player),
+				'-': lambda x: self.decreaseV(self.player),
+				'c': lambda x: self.cycle(),
+				#'i':self.love(player),
+				# 'd':#不再播放(D) (Not finished),
+				# 'c':#现则兆赫(C) (Not finished),
+				# 'h':#帮助(H) (Not finished),
+				# 'e':#退出(E) (Not finished),
+				'n': lambda x: self.nextsong(self.player),
+			}[getch.getch().lower()]('')
+	
+	def nextsong(self, player):
+		global song_length
+		self.stop()
+		song_length = 0
+		
 
 	def pause(self, player, song):
-		global pause_flag, pauseTime, pauseStartTime, starttime
+		global pause_flag, ret, pasuetime, beginpause, song_length, passedTime
+		time.sleep(0.1)
 		player.stdin.write('p')
-		time.sleep(0.2)
-		if pause_flag==0:
+		if pause_flag == 0:
 			print '暂停'
-			pauseStartTime=datetime.datetime.now()
-			pause_flag=1
-			currenttime=datetime.datetime.now()
-			passedTime=currenttime-starttime
-			lastTime = 30 - passedTime.seconds + pauseTime
-			print '剩余时间:%.2d分%.2d秒\r' % ((song['length']-passedTime.seconds+pauseTime)/60,(song['length']-passedTime.seconds+pauseTime)%60),
+			beginpause = datetime.datetime.now()
+			pause_flag = 1
+			ret = song_length- passedTime.seconds-0.1
+			print '剩余时间:%.2d分%.2d秒\r' % (ret / 60, ret % 60)
 		else:
 			print '播放'
-			pauseTime=pauseTime + (datetime.datetime.now()-pauseStartTime).seconds+1
-			pause_flag=0
+			endpause = datetime.datetime.now()
+			pasuetime = pasuetime + endpause - beginpause
+			pause_flag = 0
+
+
+	def len_zh(self, data):
+		temp = re.findall('[^\x00-\xff]+', data)
+		count = 0
+		for i in temp:
+			count += len(i)
+		return(count)
 
 	def showlist(self, playlist):
 		num = 0
 		for song in playlist['song']:
-			num = num+1
-			print num,'.', song['title'].ljust(20),
-			print "-:",song['artist']
+			num = num + 1
+			zh = self.len_zh(song['title'][0:24])
+			print num, '.', song['title'][0:24-zh].ljust(24-zh),
+			print "-:", song['artist']
 			if num > 5:
 				break
 
 	def increaseV(self, player):
-		print '增加音量',
+		print '增加音量\n',
 		player.stdin.write('0')
 
 	def decreaseV(self, player):
-		print '减小音量',
+		print '减小音量\n',
 		player.stdin.write('9')
 
-	def cycle(self, player):
-		print '单曲播放/顺序播放',
-		c = 0 if cycle else 1
+	def cycle(self):
+		global cycle
+		print '单曲播放/顺序播放\n',
+		cycle = False if cycle == True else True
 
 	def love(self, player):
 		print '标红心/取消红心',
-		
+
 	def delete(self, player):
 		time.sleep(0.5)
 
-
 	def channel(self, PP):
-		PP = ['','']
+		PP = ['', '']
 		PP = PP.split(" ")
 		if PP[1] == -1:
 			pass
@@ -195,7 +258,7 @@ class DoubanFM():
 		elif PP[1] == 7:
 			pass
 		elif PP[1] == 8:
-			pass		
+			pass
 		elif PP[1] == 9:
 			pass
 		elif PP[1] == 10:
@@ -215,7 +278,6 @@ class DoubanFM():
 			print "9   轻音乐"
 			print "10  电影原声"
 
-
 	def help(self, player):
 		print '暂停/播放r',
 		player.stdin.write('p')
@@ -224,11 +286,15 @@ class DoubanFM():
 		print '暂停/播放r',
 		player.stdin.write('q')
 
+	def stop(self):
+		self.thread_stop = True
+
+
 if __name__ == '__main__':
 	print "Welcome to the DoubanFM"
-	#user = raw_input('请输入用户名：')
-	#password = getpass.getpass('密码：')
+	# user = raw_input('请输入用户名：')
+	# password = getpass.getpass('密码：')
 	DoubanFM = DoubanFM()
-	#opener = DoubanFM.login(user, password)
-	#DoubanFM.play(opener)
+	# opener = DoubanFM.login(user, password)
+	# DoubanFM.play(opener)
 	DoubanFM.play()
