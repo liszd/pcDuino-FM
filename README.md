@@ -9,7 +9,6 @@ Other function include music listening, music identify.
 And now it still run on python.
 
 ##Update
----
 
 ###Version.2
 Change the media library from `pyglet` to `mplayer`  
@@ -24,11 +23,9 @@ Fundamentally finish the main function
 5. music can be pasued  
 
 ##Features
----
 It also not finish yet.
 
 ##Installation
----
 ```
 pip install getpass
 brew install PIL
@@ -37,7 +34,6 @@ brew install mplayer
 ```
 
 ##How to use
----
 ###Login
 
 login Douban. Input the account, password, and verification code.
@@ -48,18 +44,19 @@ And I know it is not a good way to show verification code, maybe I will try bule
 Choose the  function  
 
 ```
-"p"：# Play/Pause(P)
-"l"：# Get the playlist(L)
-"n"：# Next music(N)
-"+"：# Increase volume(+) (have bug)
-"-"：# Decrease Volume(-) (have bug)
-"c"：#单曲循环/取消单曲循环(C)(Not finished)
-"i"：#标红心/取消红心(I) (Not finished)
-"d"：#不再播放(D) (Not finished)
-"c"：#现则兆赫(C) (Not finished)
-"h"：#帮助(H) (Not finished)
-"e"：#退出(E) (Not finished)
+O: Currently playing music
+P: Pause, Resume playback
+L: Playlist
++: Increases the volume
+-: Decrease the volume
+C: Loop
+N: Next song
+I: Tag like music
+D: No longer play
+#E: Exit
+H: Help
 ```
+
 ###Channel
 ```
 -3   红心
@@ -77,7 +74,6 @@ Choose the  function
 ```
 
 ## License
----
 (The MIT License)
 
 Copyright (c) 2014 Liam <lidzd1992@gmail.com>
